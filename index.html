@@ -20,15 +20,8 @@
     th { background:#fafafa; }
     .mark-weekend { background:var(--weekend); }
     #reportHeader { text-align:center; padding:10px 0; font-size:15px; font-weight:600 }
-    .summary-col { display:none; } /* ukryta na stronie */
-    .summary-row { font-weight:500; }
-    @media print {
-      .no-print { display:none!important }
-      .summary-row { display:none; } /* ukryj dolne podsumowanie */
-      .km-row { display:none; }       /* ukryj dolne kilometry */
-      .summary-col { display:table-cell !important; border-left:3px solid #000; text-align:left; vertical-align:top; font-size:11px; }
-      @page { size:A4 landscape; margin:10mm }
-    }
+    @media print { .no-print { display:none!important } }
+    @page { size:A4 portrait; margin:10mm }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
@@ -41,23 +34,25 @@
     <button class="btn ok" id="btnExcel">Eksportuj do Excela</button>
   </div>
 
-  <div class="controls no-print" style="margin-bottom:10px;">
-    <label>Firma: <input type="text" id="company"></label>
-    <label>Kierowca: <input type="text" id="driver"></label>
-    <label>Auto: <input type="text" id="auto"></label>
-    <label>Rok: <input type="number" id="year"></label>
-    <label>Miesiąc:
-      <select id="month">
-        <option value="0">Styczeń</option><option value="1">Luty</option><option value="2">Marzec</option>
-        <option value="3">Kwiecień</option><option value="4">Maj</option><option value="5">Czerwiec</option>
-        <option value="6">Lipiec</option><option value="7">Sierpień</option><option value="8">Wrzesień</option>
-        <option value="9">Październik</option><option value="10">Listopad</option><option value="11">Grudzień</option>
-      </select>
-    </label>
-  </div>
+  <div class="card">
+    <div class="controls no-print" style="margin-bottom:10px;">
+      <label>Firma: <input type="text" id="company"></label>
+      <label>Kierowca: <input type="text" id="driver"></label>
+      <label>Auto: <input type="text" id="auto"></label>
+      <label>Rok: <input type="number" id="year"></label>
+      <label>Miesiąc:
+        <select id="month">
+          <option value="0">Styczeń</option><option value="1">Luty</option><option value="2">Marzec</option>
+          <option value="3">Kwiecień</option><option value="4">Maj</option><option value="5">Czerwiec</option>
+          <option value="6">Lipiec</option><option value="7">Sierpień</option><option value="8">Wrzesień</option>
+          <option value="9">Październik</option><option value="10">Listopad</option><option value="11">Grudzień</option>
+        </select>
+      </label>
+    </div>
 
-  <div id="reportHeader"></div>
-  <div id="tableWrapper"></div>
+    <div id="reportHeader"></div>
+    <div id="tableWrapper"></div>
+  </div>
 </div>
 
 <script>
@@ -78,7 +73,7 @@ function isWeekend(y,m,d){let wd=new Date(y,m,d).getDay();return wd===0||wd===6;
 
 function buildTable(){
   const dim=daysInMonth(state.month,state.year);
-  let html='<table><thead><tr><th>Dzień</th><th>Status</th><th>Start</th><th>Koniec</th><th class="summary-col">Podsumowanie / Kilometry</th></tr></thead><tbody>';
+  let html='<table><thead><tr><th>Dzień</th><th>Status</th><th>Start</th><th>Koniec</th></tr></thead><tbody>';
   let totalOk=0,totalX=0,totalU=0,totalW=0,totalSob=0,totalNd=0;
   for(let d=1;d<=dim;d++){
     let wd=new Date(state.year,state.month,d).getDay();
@@ -88,18 +83,6 @@ function buildTable(){
     if(val==='U') totalU++;
     if(val==='W'){ totalW++; if(wd===6) totalSob++; if(wd===0) totalNd++; }
     let h=state.hours[d]||{start:'',end:''};
-
-    let summaryCell="";
-    if(d===1){
-      summaryCell=`✔ Obecności: ${totalOk}<br>
-                   x Wolne: ${totalX}<br>
-                   U Urlopy: ${totalU}<br>
-                   W Weekendy: ${totalW} (S:${totalSob}, N:${totalNd})<br><br>
-                   Stan początek: ${state.kmStart} km<br>
-                   Stan koniec: ${state.kmEnd} km<br>
-                   Dystans: ${state.kmEnd-state.kmStart>=0?state.kmEnd-state.kmStart:""} km`;
-    }
-
     html+=`<tr class="${val==='W'?'mark-weekend':''}">
       <td>${d} ${PL_DAYS[wd]}</td>
       <td>
@@ -113,14 +96,15 @@ function buildTable(){
       </td>
       <td><input type="time" value="${h.start}" data-d="${d}" data-type="start"></td>
       <td><input type="time" value="${h.end}" data-d="${d}" data-type="end"></td>
-      <td class="summary-col">${summaryCell}</td>
     </tr>`;
   }
 
-  // podsumowanie (widoczne na stronie, ukryte w PDF)
-  html+=`<tr class="summary-row"><td colspan="4">✔ Obecności: ${totalOk} | x Wolne: ${totalX} | U Urlopy: ${totalU} | W Weekendy: ${totalW} (S:${totalSob}, N:${totalNd})</td></tr>`;
+  // podsumowanie
+  html+=`<tr><td colspan="4">✔ Obecności: ${totalOk} | x Wolne: ${totalX} | U Urlopy: ${totalU} | W Weekendy: ${totalW} (Soboty:${totalSob}, Niedziele:${totalNd})</td></tr>`;
+
+  // kilometry
   const traveled=state.kmEnd-state.kmStart;
-  html+=`<tr class="km-row"><td>Stan początek: <input type="number" id="kmStart" value="${state.kmStart}" style="width:80px"></td>
+  html+=`<tr><td>Stan początek: <input type="number" id="kmStart" value="${state.kmStart}" style="width:80px"></td>
              <td>Stan koniec: <input type="number" id="kmEnd" value="${state.kmEnd}" style="width:80px"></td>
              <td colspan="2">Przebyty dystans: ${traveled>=0?traveled:''} km</td></tr>`;
 
@@ -135,10 +119,8 @@ function buildTable(){
     if(!state.hours[d]) state.hours[d]={start:'',end:''};
     state.hours[d][type]=e.target.value;
   }));
-  const kmStart=document.getElementById('kmStart');
-  const kmEnd=document.getElementById('kmEnd');
-  if(kmStart) kmStart.addEventListener('input',e=>{state.kmStart=parseInt(e.target.value)||0; buildTable();});
-  if(kmEnd) kmEnd.addEventListener('input',e=>{state.kmEnd=parseInt(e.target.value)||0; buildTable();});
+  document.getElementById('kmStart').addEventListener('input',e=>{state.kmStart=parseInt(e.target.value)||0;buildTable();});
+  document.getElementById('kmEnd').addEventListener('input',e=>{state.kmEnd=parseInt(e.target.value)||0;buildTable();});
 
   updateHeader();
 }
@@ -153,7 +135,7 @@ function updateHeader(){
 // PDF
 document.getElementById('btnPdf').addEventListener('click',()=>window.print());
 
-// Excel (bez zmian)
+// Excel
 document.getElementById('btnExcel').addEventListener('click',()=>{
   const days=daysInMonth(state.month,state.year);
   let obecnosci=[["Dzień","Nazwa dnia","Status","Start","Koniec"]];
@@ -182,7 +164,13 @@ elMonth.addEventListener('input',()=>{state.month=parseInt(elMonth.value,10); bu
 elDriver.addEventListener('input',()=>{state.driver=elDriver.value; updateHeader();});
 elAuto.addEventListener('input',()=>{state.auto=elAuto.value; updateHeader();});
 
-(function start(){elYear.value=state.year;elMonth.value=state.month;buildTable();})();
+(function start(){
+  elYear.value=state.year;
+  elMonth.value=state.month;
+  elDriver.value=state.driver;
+  elAuto.value=state.auto;
+  buildTable();
+})();
 </script>
 </body>
 </html>
