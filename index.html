@@ -4,11 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Generator listy obecności</title>
- <link rel="icon" type="image/x-icon" href="favicon.ico">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"> 
- 
+
+  <!-- Ikony -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+
+  <!-- Manifest -->
+  <link rel="manifest" href="manifest.json">
+
   <style>
     body { margin:0; font-family:"Times New Roman", Times, serif; background:#f7f7fb; color:#111; }
     .wrap { max-width:900px; margin:24px auto; padding:0 16px; }
@@ -28,7 +33,6 @@
       table th, table td { padding:2px 3px; font-size:10px; }
       .no-print { display:none!important; }
       #footer { margin-top:10px; font-size:10px; }
-      /* zachowujemy kolory weekendów w PDF */
       .mark-weekend { background:#fde68a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       @page { size:A4 portrait; margin:8mm }
     }
@@ -183,11 +187,19 @@ elAuto.addEventListener('input',()=>{state.auto=elAuto.value; updateHeader();});
   elYear.value=state.year;
   elMonth.value=state.month;
   buildTable();
-  // data w stopce
   const d=new Date();
   document.getElementById("genDate").textContent="Wygenerowano: "+
-    d.toLocaleDateString("pl-PL",{year:"numeric",month:"2-digit",day:"2-digit"});
+    d.toLocaleDateString("pl-PL",{year:"numeric",month:"2-digit",day:"2-digit"})+" "+
+    d.toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"});
 })();
+</script>
+
+<!-- Rejestracja service workera -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js')
+    .then(() => console.log("Service Worker zarejestrowany"));
+}
 </script>
 </body>
 </html>
