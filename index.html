@@ -126,7 +126,10 @@ function buildTable(){
 }
 
 function updateHeader(){
-  reportHeader.innerHTML=`Firma: ${document.getElementById('company').value||''}<br>Kierowca: ${state.driver} | Auto: ${state.auto}<br>Lista obecności – ${PL_MONTHS[state.month]} ${state.year}`;
+  reportHeader.innerHTML =
+    `Firma: ${document.getElementById('company').value || ''}<br>` +
+    `Kierowca: ${state.driver} | Auto: ${state.auto}<br>` +
+    `Lista obecności – ${PL_MONTHS[state.month]} ${state.year}`;
 }
 
 // PDF
@@ -142,7 +145,7 @@ document.getElementById('btnExcel').addEventListener('click',()=>{
     const val=state.attendance[d]||''; const h=state.hours[d]||{start:'',end:''};
     obecnosci.push([d,nazwaDnia,val,h.start,h.end]);
   }
-  let podsumowanie=[["✔ Obecności", "x Wolne", "U Urlopy", "W Weekendy (Sob/Nd)"],
+  let podsumowanie=[["✔ Obecności","x Wolne","U Urlopy","W Weekendy (Sob/Nd)"],
                     [obecnosci.filter(r=>r[2]==='✔').length,
                      obecnosci.filter(r=>r[2]==='x').length,
                      obecnosci.filter(r=>r[2]==='U').length,
@@ -161,7 +164,13 @@ elMonth.addEventListener('input',()=>{state.month=parseInt(elMonth.value,10); bu
 elDriver.addEventListener('input',()=>{state.driver=elDriver.value; updateHeader();});
 elAuto.addEventListener('input',()=>{state.auto=elAuto.value; updateHeader();});
 
-(function start(){elYear.value=state.year;elMonth.value=state.month;buildTable();})();
+(function start(){
+  elYear.value=state.year;
+  elMonth.value=state.month;
+  elDriver.value=state.driver;
+  elAuto.value=state.auto;
+  buildTable();
+})();
 </script>
 </body>
 </html>
