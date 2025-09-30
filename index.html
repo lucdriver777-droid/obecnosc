@@ -1,42 +1,29 @@
 <!doctype html>
-
 <html lang="pl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Generator listy obecności</title>
   <style>
-    :root{
-      --bg:#f7f7fb; --ink:#111; --muted:#6b7280; --brand:#0ea5e9; --ok:#16a34a; --danger:#ef4444;
-      --card:#ffffff; --line:#e5e7eb; --weekend:#fff7ed; --holiday:#fee2e2; --weekend-mark:#fde68a;
+    :root {
+      --bg:#f7f7fb; --ink:#111; --line:#e5e7eb; --brand:#0ea5e9; --ok:#16a34a; --danger:#ef4444; --weekend:#fde68a;
     }
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:var(--bg);color:var(--ink);} 
-    .wrap{max-width:1200px;margin:24px auto;padding:0 16px;}
-    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-    .toolbar .spacer{flex:1}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-    .controls{padding:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-    .controls input[type="text"], .controls input[type="number"], .controls select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;min-width:120px;font-size:13px}
-    .btn{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font-size:13px}
-    .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
-    .btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
-    .btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
-    .btn:disabled{opacity:.5;cursor:not-allowed}table{width:100%;border-collapse:collapse;margin-bottom:16px}
-th,td{border:1px solid var(--line);padding:4px 6px;text-align:center;font-size:12px}
-thead th{position:sticky;top:0;background:#fafafa;z-index:2}
-tbody th{position:sticky;left:0;background:#fafafa;text-align:left;z-index:1}
-.name-cell{min-width:160px;text-align:left}
-.day-weekend{background:var(--weekend)}
-.day-holiday{background:var(--holiday)}
-.total-col{font-weight:600}
-.mark-weekend{background:var(--weekend-mark) !important;}
-
-#reportHeader{text-align:center;padding:10px 0;font-size:15px;font-weight:600}
-
-@media print{.no-print{display:none !important}}
-@page{size:A4 landscape;margin:10mm}
-
+    body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+    .wrap { max-width:900px; margin:24px auto; padding:0 16px; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+    .toolbar .spacer { flex:1; }
+    .btn { padding:6px 10px; border:1px solid var(--line); border-radius:8px; cursor:pointer; font-size:13px; }
+    .btn.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
+    .btn.ok { background:var(--ok); border-color:var(--ok); color:#fff; }
+    table { width:100%; border-collapse:collapse; margin-bottom:16px; }
+    th, td { border:1px solid var(--line); padding:4px 6px; font-size:12px; text-align:center; }
+    th { background:#fafafa; }
+    .mark-weekend { background:var(--weekend); }
+    #reportHeader { text-align:center; padding:10px 0; font-size:15px; font-weight:600 }
+    @media print { .no-print { display:none!important } }
+    @page { size:A4 portrait; margin:10mm }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -44,10 +31,12 @@ tbody th{position:sticky;left:0;background:#fafafa;text-align:left;z-index:1}
     <h1 style="margin:0;font-size:20px">✅ Generator listy obecności</h1>
     <div class="spacer"></div>
     <button class="btn primary" id="btnPdf">Eksportuj do PDF</button>
-  </div>  <div class="card">
-    <div class="controls no-print">
+    <button class="btn ok" id="btnExcel">Eksportuj do Excela</button>
+  </div>
+
+  <div class="card">
+    <div class="controls no-print" style="margin-bottom:10px;">
       <label>Firma: <input type="text" id="company"></label>
-      <label>Dział: <input type="text" id="department"></label>
       <label>Kierowca: <input type="text" id="driver"></label>
       <label>Rok: <input type="number" id="year"></label>
       <label>Miesiąc:
@@ -58,53 +47,43 @@ tbody th{position:sticky;left:0;background:#fafafa;text-align:left;z-index:1}
           <option value="9">Październik</option><option value="10">Listopad</option><option value="11">Grudzień</option>
         </select>
       </label>
-    </div><div id="reportHeader"></div>
+    </div>
 
-<div id="tableWrapper"></div>
-<div id="summary" style="padding:10px;font-size:13px"></div>
-<div id="kmSection" style="padding:10px;font-size:13px">
-  <h3>🚗 Kilometry</h3>
-  <div class="km-edit no-print">
-    <label>Stan licznika początek miesiąca: <input type="number" id="kmStart"></label>
-    <label>Stan licznika koniec miesiąca: <input type="number" id="kmEnd"></label>
-    <div id="kmSummary" style="margin-top:8px;font-weight:600"></div>
+    <div id="reportHeader"></div>
+
+    <div id="tableWrapper"></div>
+    <div id="summary" style="padding:10px;font-size:13px"></div>
+
+    <div id="kmSection" style="padding:10px;font-size:13px">
+      <h3>🚗 Kilometry</h3>
+      <div class="km-edit no-print">
+        <label>Stan licznika początek miesiąca: <input type="number" id="kmStart"></label>
+        <label>Stan licznika koniec miesiąca: <input type="number" id="kmEnd"></label>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <thead><tr>
+          <th>Stan początek</th><th>Stan koniec</th><th>Przebyty dystans</th>
+        </tr></thead>
+        <tbody><tr>
+          <td id="kmCellStart">0 km</td><td id="kmCellEnd">0 km</td><td id="kmCellDiff">0 km</td>
+        </tr></tbody>
+      </table>
+    </div>
   </div>
-
-  <!-- Raport do PDF -->
-  <table id="kmReport" style="width:100%;border-collapse:collapse;margin-top:10px">
-    <thead>
-      <tr>
-        <th style="border:1px solid var(--line);padding:6px">Stan licznika – początek</th>
-        <th style="border:1px solid var(--line);padding:6px">Stan licznika – koniec</th>
-        <th style="border:1px solid var(--line);padding:6px">Przebyty dystans</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td id="kmCellStart" style="border:1px solid var(--line);padding:6px">0 km</td>
-        <td id="kmCellEnd" style="border:1px solid var(--line);padding:6px">0 km</td>
-        <td id="kmCellDiff" style="border:1px solid var(--line);padding:6px">0 km</td>
-      </tr>
-    </tbody>
-  </table>
 </div>
 
-  </div>
-</div><script>
+<script>
 const PL_DAYS=['Nd','Pn','Wt','Śr','Cz','Pt','So'];
 const PL_MONTHS=['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
 
-const state={year:new Date().getFullYear(),month:new Date().getMonth(),driver:'',people:['Jan Kowalski'],attendance:{},hours:{},kmStart:0,kmEnd:0};
-
+const state={year:new Date().getFullYear(),month:new Date().getMonth(),driver:'',attendance:{},hours:{},kmStart:0,kmEnd:0};
 const elYear=document.getElementById('year');
 const elMonth=document.getElementById('month');
 const elDriver=document.getElementById('driver');
-const elPdf=document.getElementById('btnPdf');
 const wrapper=document.getElementById('tableWrapper');
 const summaryEl=document.getElementById('summary');
 const kmStart=document.getElementById('kmStart');
 const kmEnd=document.getElementById('kmEnd');
-const kmSummary=document.getElementById('kmSummary');
 const kmCellStart=document.getElementById('kmCellStart');
 const kmCellEnd=document.getElementById('kmCellEnd');
 const kmCellDiff=document.getElementById('kmCellDiff');
@@ -112,135 +91,86 @@ const reportHeader=document.getElementById('reportHeader');
 
 function daysInMonth(m,y){return new Date(y,m+1,0).getDate();}
 function isWeekend(y,m,d){let wd=new Date(y,m,d).getDay();return wd===0||wd===6;}
-function storageKey(){return `attendance-${state.year}-${String(state.month+1).padStart(2,'0')}`;}
-
-function ensureMatrix(){
-  const dim=daysInMonth(state.month,state.year);
-  state.people.forEach((_,i)=>{
-    if(!state.attendance[i])state.attendance[i]={};
-    if(!state.hours[i])state.hours[i]={};
-    for(let d=1;d<=dim;d++){
-      if(!state.attendance[i][d]){
-        if(isWeekend(state.year,state.month,d)){
-          state.attendance[i][d]='W';
-        } else {
-          state.attendance[i][d]='';
-        }
-      }
-      if(!state.hours[i][d])state.hours[i][d]={start:'',end:''};
-    }
-  });
-}
 
 function buildTable(){
-  ensureMatrix();
-  updateHeader();
   const dim=daysInMonth(state.month,state.year);
-  let html='<table><thead><tr><th>Dzień</th>';
-  for(let d=1;d<=dim;d++){let wd=new Date(state.year,state.month,d).getDay();html+=`<th ${isWeekend(state.year,state.month,d)?'class="day-weekend"':''}>${d}<div class=small>${PL_DAYS[wd]}</div></th>`}
-  html+='<th>✔</th><th>x</th><th>U</th><th>W</th></tr></thead><tbody>';
-  state.people.forEach((p,i)=>{
-    let sumOk=0,sumX=0,sumU=0,sumW=0;
-    html+=`<tr><th class=name-cell>${p}</th>`;
-    for(let d=1;d<=dim;d++){
-      const val=state.attendance[i][d]||'';
-      if(val==='✔') sumOk++;
-      if(val==='x') sumX++;
-      if(val==='U') sumU++;
-      if(val==='W') sumW++;
-      const h=state.hours[i][d];
-      html+=`<td style="min-width:70px" class="${val==='W'?'mark-weekend':''}">
-        <select data-i="${i}" data-d="${d}" class="statusSel">
+  let html='<table><thead><tr><th>Dzień</th><th>Status</th><th>Start</th><th>Koniec</th></tr></thead><tbody>';
+  let totalOk=0,totalX=0,totalU=0,totalW=0,totalSob=0,totalNd=0;
+  for(let d=1;d<=dim;d++){
+    let wd=new Date(state.year,state.month,d).getDay();
+    let val=state.attendance[d]|| (isWeekend(state.year,state.month,d)?'W':'');
+    if(val==='✔') totalOk++;
+    if(val==='x') totalX++;
+    if(val==='U') totalU++;
+    if(val==='W'){ totalW++; if(wd===6) totalSob++; if(wd===0) totalNd++; }
+    let h=state.hours[d]||{start:'',end:''};
+    html+=`<tr class="${val==='W'?'mark-weekend':''}">
+      <td>${d} ${PL_DAYS[wd]}</td>
+      <td>
+        <select data-d="${d}" class="statusSel">
           <option value="" ${val===''?'selected':''}></option>
           <option value="✔" ${val==='✔'?'selected':''}>✔</option>
           <option value="x" ${val==='x'?'selected':''}>x</option>
           <option value="U" ${val==='U'?'selected':''}>U</option>
           <option value="W" ${val==='W'?'selected':''}>W</option>
-        </select><br>
-        <input type="time" value="${h.start}" data-i="${i}" data-d="${d}" data-type="start" style="width:60px;font-size:10px"><br>
-        <input type="time" value="${h.end}" data-i="${i}" data-d="${d}" data-type="end" style="width:60px;font-size:10px">
-      </td>`;
-    }
-    html+=`<td class=total-col>${sumOk}</td><td class=total-col>${sumX}</td><td class=total-col>${sumU}</td><td class=total-col>${sumW}</td></tr>`;
-  });
+        </select>
+      </td>
+      <td><input type="time" value="${h.start}" data-d="${d}" data-type="start"></td>
+      <td><input type="time" value="${h.end}" data-d="${d}" data-type="end"></td>
+    </tr>`;
+  }
   html+='</tbody></table>';
   wrapper.innerHTML=html;
-  wrapper.querySelectorAll('.statusSel').forEach(sel=>sel.addEventListener('change',onStatusChange));
-  wrapper.querySelectorAll('input[type="time"]').forEach(inp=>inp.addEventListener('change',onTimeChange));
-  updateSummary();
-}
-
-function updateHeader(){
-  const m=PL_MONTHS[state.month];
-  const y=state.year;
-  const d=state.driver||'';
-  reportHeader.innerHTML=`Lista obecności – ${m} ${y}<br>Kierowca: ${d}`;
-}
-
-function onStatusChange(e){const i=e.target.dataset.i,d=e.target.dataset.d;state.attendance[i][d]=e.target.value;save();buildTable();}
-function onTimeChange(e){const i=e.target.dataset.i,d=e.target.dataset.d,type=e.target.dataset.type;state.hours[i][d][type]=e.target.value;save();}
-
-function updateSummary(){
-  const dim=daysInMonth(state.month,state.year);
-  let totalOk=0,totalX=0,totalU=0,totalW=0,totalSob=0,totalNd=0;
-  state.people.forEach((_,i)=>{
-    for(let d=1;d<=dim;d++){
-      let val=state.attendance[i][d];
-      if(val==='✔')totalOk++;
-      if(val==='x')totalX++;
-      if(val==='U')totalU++;
-      if(val==='W'){
-        totalW++;
-        let wd=new Date(state.year,state.month,d).getDay();
-        if(wd===6) totalSob++;
-        if(wd===0) totalNd++;
-      }
-    }
-  });
-  summaryEl.innerHTML=`<b>Podsumowanie:</b> ✔ Obecności: ${totalOk}, x Dni wolne: ${totalX}, U Urlopy: ${totalU}, W Weekendy: ${totalW} (Soboty: ${totalSob}, Niedziele: ${totalNd})`;
+  wrapper.querySelectorAll('.statusSel').forEach(sel=>sel.addEventListener('change',e=>{
+    const d=e.target.dataset.d; state.attendance[d]=e.target.value; buildTable();
+  }));
+  wrapper.querySelectorAll('input[type="time"]').forEach(inp=>inp.addEventListener('change',e=>{
+    const d=e.target.dataset.d; const type=e.target.dataset.type;
+    if(!state.hours[d]) state.hours[d]={start:'',end:''};
+    state.hours[d][type]=e.target.value;
+  }));
+  summaryEl.innerHTML=`✔ Obecności: ${totalOk}, x Wolne: ${totalX}, U Urlopy: ${totalU}, W Weekendy: ${totalW} (Soboty:${totalSob}, Niedziele:${totalNd})`;
+  updateHeader();
   updateKmSummary();
 }
 
+function updateHeader(){ reportHeader.innerHTML=`Lista obecności – ${PL_MONTHS[state.month]} ${state.year}<br>Kierowca: ${state.driver}`; }
 function updateKmSummary(){
-  state.kmStart=parseInt(kmStart.value||0,10);
-  state.kmEnd=parseInt(kmEnd.value||0,10);
+  state.kmStart=parseInt(kmStart.value||0,10); state.kmEnd=parseInt(kmEnd.value||0,10);
   const traveled=state.kmEnd-state.kmStart;
-  if(!Number.isNaN(state.kmStart)) kmCellStart.textContent = `${state.kmStart} km`; else kmCellStart.textContent = '-';
-  if(!Number.isNaN(state.kmEnd)) kmCellEnd.textContent = `${state.kmEnd} km`; else kmCellEnd.textContent = '-';
-  if(traveled>=0){
-    kmSummary.textContent=`Przebyty dystans: ${traveled} km`;
-    kmCellDiff.textContent=`${traveled} km`;
-  } else {
-    kmSummary.textContent='';
-    kmCellDiff.textContent='-';
+  kmCellStart.textContent=`${state.kmStart} km`; kmCellEnd.textContent=`${state.kmEnd} km`;
+  kmCellDiff.textContent= traveled>=0?`${traveled} km`:'';
+}
+
+document.getElementById('btnPdf').addEventListener('click',()=>window.print());
+
+document.getElementById('btnExcel').addEventListener('click',()=>{
+  const days=daysInMonth(state.month,state.year);
+  let obecnosci=[["Dzień","Nazwa dnia","Status","Start","Koniec"]];
+  for(let d=1;d<=days;d++){
+    const wd=new Date(state.year,state.month,d).getDay();
+    const nazwaDnia=PL_DAYS[wd];
+    const val=state.attendance[d]||''; const h=state.hours[d]||{start:'',end:''};
+    obecnosci.push([d,nazwaDnia,val,h.start,h.end]);
   }
-  save();
-}
+  let podsumowanie=[]; 
+  summaryEl.textContent.split(',').forEach(s=>{podsumowanie.push([s.trim()])});
+  const traveled=state.kmEnd-state.kmStart;
+  let kilometry=[["Stan początek","Stan koniec","Przebyty dystans"],[state.kmStart,state.kmEnd,traveled>=0?traveled:""]];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(obecnosci),"Obecność");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(podsumowanie),"Podsumowanie");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(kilometry),"Kilometry");
+  XLSX.writeFile(wb,`Lista_obecnosci_${state.year}_${state.month+1}.xlsx`);
+});
 
-function save(){
-  const key=storageKey();
-  const payload={year:state.year,month:state.month,driver:state.driver,people:state.people,attendance:state.attendance,hours:state.hours,kmStart:state.kmStart,kmEnd:state.kmEnd};
-  localStorage.setItem(key,JSON.stringify(payload));
-}
-
-function load(){
-  const key=storageKey();
-  const raw=localStorage.getItem(key);
-  if(!raw) return false;
-  try{
-    const data=JSON.parse(raw);
-    state.year=data.year;state.month=data.month;state.driver=data.driver||'';state.people=data.people;state.attendance=data.attendance;state.hours=data.hours;state.kmStart=data.kmStart||0;state.kmEnd=data.kmEnd||0;
-    kmStart.value=state.kmStart;kmEnd.value=state.kmEnd;elDriver.value=state.driver;
-    return true;
-  }catch{return false;}
-}
-
-elDriver.addEventListener('input',()=>{state.driver=elDriver.value;save();updateHeader();});
+elYear.addEventListener('input',()=>{state.year=parseInt(elYear.value,10)||new Date().getFullYear(); buildTable();});
+elMonth.addEventListener('input',()=>{state.month=parseInt(elMonth.value,10); buildTable();});
+elDriver.addEventListener('input',()=>{state.driver=elDriver.value; updateHeader();});
 kmStart.addEventListener('input',updateKmSummary);
 kmEnd.addEventListener('input',updateKmSummary);
 
-elPdf.addEventListener('click',()=>window.print());
-
-(function start(){elYear.value=state.year;elMonth.value=state.month;if(!load())ensureMatrix();buildTable();updateKmSummary();})();
-</script></body>
+(function start(){elYear.value=state.year;elMonth.value=state.month;buildTable();})();
+</script>
+</body>
 </html>
