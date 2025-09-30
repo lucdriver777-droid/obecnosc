@@ -23,6 +23,8 @@
       table th, table td { padding:2px 3px; font-size:10px; }
       .no-print { display:none!important; }
       #footer { margin-top:10px; font-size:10px; }
+      /* zachowujemy kolory weekendów w PDF */
+      .mark-weekend { background:#fde68a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       @page { size:A4 portrait; margin:8mm }
     }
   </style>
@@ -54,7 +56,7 @@
 
   <div id="reportHeader"></div>
   <div id="tableWrapper"></div>
-  <div id="footer">Twórcy: Łukasz Stasinski &amp; ChatGPT</div>
+  <div id="footer">Twórcy: Łukasz Stasinski &amp; ChatGPT<br><span id="genDate"></span></div>
 </div>
 
 <script>
@@ -172,7 +174,15 @@ elMonth.addEventListener('input',()=>{state.month=parseInt(elMonth.value,10); bu
 elDriver.addEventListener('input',()=>{state.driver=elDriver.value; updateHeader();});
 elAuto.addEventListener('input',()=>{state.auto=elAuto.value; updateHeader();});
 
-(function start(){elYear.value=state.year;elMonth.value=state.month;buildTable();})();
+(function start(){
+  elYear.value=state.year;
+  elMonth.value=state.month;
+  buildTable();
+  // data w stopce
+  const d=new Date();
+  document.getElementById("genDate").textContent="Wygenerowano: "+
+    d.toLocaleDateString("pl-PL",{year:"numeric",month:"2-digit",day:"2-digit"});
+})();
 </script>
 </body>
 </html>
