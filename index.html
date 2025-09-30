@@ -9,20 +9,26 @@
       --bg:#f7f7fb; --ink:#111; --line:#e5e7eb; --brand:#0ea5e9; --ok:#16a34a; --danger:#ef4444; --weekend:#fde68a;
     }
     body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
-    .wrap { max-width:1100px; margin:24px auto; padding:0 16px; }
+    .wrap { max-width:900px; margin:24px auto; padding:0 16px; }
     .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
     .toolbar .spacer { flex:1; }
     .btn { padding:6px 10px; border:1px solid var(--line); border-radius:8px; cursor:pointer; font-size:13px; }
     .btn.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
     .btn.ok { background:var(--ok); border-color:var(--ok); color:#fff; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { border:1px solid var(--line); padding:4px 6px; font-size:12px; text-align:center; vertical-align:middle; }
+    table { width:100%; border-collapse:collapse; margin-bottom:16px; }
+    th, td { border:1px solid var(--line); padding:4px 6px; font-size:12px; text-align:center; }
     th { background:#fafafa; }
     .mark-weekend { background:var(--weekend); }
     #reportHeader { text-align:center; padding:10px 0; font-size:15px; font-weight:600 }
-    .summary-col { border-left:3px solid #000; text-align:left; font-size:12px; }
-    @media print { .no-print { display:none!important } }
-    @page { size:A4 landscape; margin:10mm } /* szeroki układ */
+    .summary-col { display:none; } /* ukryta na stronie */
+    .summary-row { font-weight:500; }
+    @media print {
+      .no-print { display:none!important }
+      .summary-row { display:none; } /* ukryj dolne podsumowanie */
+      .km-row { display:none; }       /* ukryj dolne kilometry */
+      .summary-col { display:table-cell !important; border-left:3px solid #000; text-align:left; vertical-align:top; font-size:11px; }
+      @page { size:A4 landscape; margin:10mm }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
@@ -74,7 +80,6 @@ function buildTable(){
   const dim=daysInMonth(state.month,state.year);
   let html='<table><thead><tr><th>Dzień</th><th>Status</th><th>Start</th><th>Koniec</th><th class="summary-col">Podsumowanie / Kilometry</th></tr></thead><tbody>';
   let totalOk=0,totalX=0,totalU=0,totalW=0,totalSob=0,totalNd=0;
-
   for(let d=1;d<=dim;d++){
     let wd=new Date(state.year,state.month,d).getDay();
     let val=state.attendance[d]|| (isWeekend(state.year,state.month,d)?'W':'');
@@ -84,15 +89,14 @@ function buildTable(){
     if(val==='W'){ totalW++; if(wd===6) totalSob++; if(wd===0) totalNd++; }
     let h=state.hours[d]||{start:'',end:''};
 
-    // tylko pierwszy wiersz pokazuje podsumowanie/kilometry (reszta pusta)
     let summaryCell="";
     if(d===1){
       summaryCell=`✔ Obecności: ${totalOk}<br>
                    x Wolne: ${totalX}<br>
                    U Urlopy: ${totalU}<br>
                    W Weekendy: ${totalW} (S:${totalSob}, N:${totalNd})<br><br>
-                   Stan początek: <input type="number" id="kmStart" value="${state.kmStart}" style="width:80px"><br>
-                   Stan koniec: <input type="number" id="kmEnd" value="${state.kmEnd}" style="width:80px"><br>
+                   Stan początek: ${state.kmStart} km<br>
+                   Stan koniec: ${state.kmEnd} km<br>
                    Dystans: ${state.kmEnd-state.kmStart>=0?state.kmEnd-state.kmStart:""} km`;
     }
 
@@ -112,6 +116,14 @@ function buildTable(){
       <td class="summary-col">${summaryCell}</td>
     </tr>`;
   }
+
+  // podsumowanie (widoczne na stronie, ukryte w PDF)
+  html+=`<tr class="summary-row"><td colspan="4">✔ Obecności: ${totalOk} | x Wolne: ${totalX} | U Urlopy: ${totalU} | W Weekendy: ${totalW} (S:${totalSob}, N:${totalNd})</td></tr>`;
+  const traveled=state.kmEnd-state.kmStart;
+  html+=`<tr class="km-row"><td>Stan początek: <input type="number" id="kmStart" value="${state.kmStart}" style="width:80px"></td>
+             <td>Stan koniec: <input type="number" id="kmEnd" value="${state.kmEnd}" style="width:80px"></td>
+             <td colspan="2">Przebyty dystans: ${traveled>=0?traveled:''} km</td></tr>`;
+
   html+='</tbody></table>';
   wrapper.innerHTML=html;
 
@@ -141,7 +153,7 @@ function updateHeader(){
 // PDF
 document.getElementById('btnPdf').addEventListener('click',()=>window.print());
 
-// Excel
+// Excel (bez zmian)
 document.getElementById('btnExcel').addEventListener('click',()=>{
   const days=daysInMonth(state.month,state.year);
   let obecnosci=[["Dzień","Nazwa dnia","Status","Start","Koniec"]];
