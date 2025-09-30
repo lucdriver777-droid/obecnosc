@@ -122,8 +122,14 @@ function buildTable(){
   }));
   const kmStart=document.getElementById('kmStart');
   const kmEnd=document.getElementById('kmEnd');
-  if(kmStart) kmStart.addEventListener('input',e=>{state.kmStart=parseInt(e.target.value)||0;});
-  if(kmEnd) kmEnd.addEventListener('input',e=>{state.kmEnd=parseInt(e.target.value)||0;});
+  if(kmStart) kmStart.addEventListener('input',e=>{
+    state.kmStart=parseInt(e.target.value)||0;
+    buildTable();
+  });
+  if(kmEnd) kmEnd.addEventListener('input',e=>{
+    state.kmEnd=parseInt(e.target.value)||0;
+    buildTable();
+  });
   updateHeader();
 }
 
