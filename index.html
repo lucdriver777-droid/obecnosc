@@ -38,6 +38,7 @@
     <div class="controls no-print" style="margin-bottom:10px;">
       <label>Firma: <input type="text" id="company"></label>
       <label>Kierowca: <input type="text" id="driver"></label>
+      <label>Auto: <input type="text" id="auto"></label>
       <label>Rok: <input type="number" id="year"></label>
       <label>Miesiąc:
         <select id="month">
@@ -50,25 +51,7 @@
     </div>
 
     <div id="reportHeader"></div>
-
     <div id="tableWrapper"></div>
-    <div id="summary" style="padding:10px;font-size:13px"></div>
-
-    <div id="kmSection" style="padding:10px;font-size:13px">
-      <h3>🚗 Kilometry</h3>
-      <div class="km-edit no-print">
-        <label>Stan licznika początek miesiąca: <input type="number" id="kmStart"></label>
-        <label>Stan licznika koniec miesiąca: <input type="number" id="kmEnd"></label>
-      </div>
-      <table style="width:100%;border-collapse:collapse;margin-top:10px">
-        <thead><tr>
-          <th>Stan początek</th><th>Stan koniec</th><th>Przebyty dystans</th>
-        </tr></thead>
-        <tbody><tr>
-          <td id="kmCellStart">0 km</td><td id="kmCellEnd">0 km</td><td id="kmCellDiff">0 km</td>
-        </tr></tbody>
-      </table>
-    </div>
   </div>
 </div>
 
@@ -76,17 +59,13 @@
 const PL_DAYS=['Nd','Pn','Wt','Śr','Cz','Pt','So'];
 const PL_MONTHS=['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
 
-const state={year:new Date().getFullYear(),month:new Date().getMonth(),driver:'',attendance:{},hours:{},kmStart:0,kmEnd:0};
+const state={year:new Date().getFullYear(),month:new Date().getMonth(),driver:'',auto:'',attendance:{},hours:{},kmStart:0,kmEnd:0};
+
 const elYear=document.getElementById('year');
 const elMonth=document.getElementById('month');
 const elDriver=document.getElementById('driver');
+const elAuto=document.getElementById('auto');
 const wrapper=document.getElementById('tableWrapper');
-const summaryEl=document.getElementById('summary');
-const kmStart=document.getElementById('kmStart');
-const kmEnd=document.getElementById('kmEnd');
-const kmCellStart=document.getElementById('kmCellStart');
-const kmCellEnd=document.getElementById('kmCellEnd');
-const kmCellDiff=document.getElementById('kmCellDiff');
 const reportHeader=document.getElementById('reportHeader');
 
 function daysInMonth(m,y){return new Date(y,m+1,0).getDate();}
@@ -119,8 +98,19 @@ function buildTable(){
       <td><input type="time" value="${h.end}" data-d="${d}" data-type="end"></td>
     </tr>`;
   }
+
+  // podsumowanie
+  html+=`<tr><td colspan="4">✔ Obecności: ${totalOk} | x Wolne: ${totalX} | U Urlopy: ${totalU} | W Weekendy: ${totalW} (Soboty:${totalSob}, Niedziele:${totalNd})</td></tr>`;
+
+  // kilometry
+  const traveled=state.kmEnd-state.kmStart;
+  html+=`<tr><td>Stan początek: <input type="number" id="kmStart" value="${state.kmStart}" style="width:80px"></td>
+             <td>Stan koniec: <input type="number" id="kmEnd" value="${state.kmEnd}" style="width:80px"></td>
+             <td colspan="2">Przebyty dystans: ${traveled>=0?traveled:''} km</td></tr>`;
+
   html+='</tbody></table>';
   wrapper.innerHTML=html;
+
   wrapper.querySelectorAll('.statusSel').forEach(sel=>sel.addEventListener('change',e=>{
     const d=e.target.dataset.d; state.attendance[d]=e.target.value; buildTable();
   }));
@@ -129,21 +119,20 @@ function buildTable(){
     if(!state.hours[d]) state.hours[d]={start:'',end:''};
     state.hours[d][type]=e.target.value;
   }));
-  summaryEl.innerHTML=`✔ Obecności: ${totalOk}, x Wolne: ${totalX}, U Urlopy: ${totalU}, W Weekendy: ${totalW} (Soboty:${totalSob}, Niedziele:${totalNd})`;
+  document.getElementById('kmStart').addEventListener('input',e=>{state.kmStart=parseInt(e.target.value)||0;buildTable();});
+  document.getElementById('kmEnd').addEventListener('input',e=>{state.kmEnd=parseInt(e.target.value)||0;buildTable();});
+
   updateHeader();
-  updateKmSummary();
 }
 
-function updateHeader(){ reportHeader.innerHTML=`Lista obecności – ${PL_MONTHS[state.month]} ${state.year}<br>Kierowca: ${state.driver}`; }
-function updateKmSummary(){
-  state.kmStart=parseInt(kmStart.value||0,10); state.kmEnd=parseInt(kmEnd.value||0,10);
-  const traveled=state.kmEnd-state.kmStart;
-  kmCellStart.textContent=`${state.kmStart} km`; kmCellEnd.textContent=`${state.kmEnd} km`;
-  kmCellDiff.textContent= traveled>=0?`${traveled} km`:'';
+function updateHeader(){
+  reportHeader.innerHTML=`Firma: ${document.getElementById('company').value||''}<br>Kierowca: ${state.driver} | Auto: ${state.auto}<br>Lista obecności – ${PL_MONTHS[state.month]} ${state.year}`;
 }
 
+// PDF
 document.getElementById('btnPdf').addEventListener('click',()=>window.print());
 
+// Excel
 document.getElementById('btnExcel').addEventListener('click',()=>{
   const days=daysInMonth(state.month,state.year);
   let obecnosci=[["Dzień","Nazwa dnia","Status","Start","Koniec"]];
@@ -153,10 +142,13 @@ document.getElementById('btnExcel').addEventListener('click',()=>{
     const val=state.attendance[d]||''; const h=state.hours[d]||{start:'',end:''};
     obecnosci.push([d,nazwaDnia,val,h.start,h.end]);
   }
-  let podsumowanie=[]; 
-  summaryEl.textContent.split(',').forEach(s=>{podsumowanie.push([s.trim()])});
-  const traveled=state.kmEnd-state.kmStart;
-  let kilometry=[["Stan początek","Stan koniec","Przebyty dystans"],[state.kmStart,state.kmEnd,traveled>=0?traveled:""]];
+  let podsumowanie=[["✔ Obecności", "x Wolne", "U Urlopy", "W Weekendy (Sob/Nd)"],
+                    [obecnosci.filter(r=>r[2]==='✔').length,
+                     obecnosci.filter(r=>r[2]==='x').length,
+                     obecnosci.filter(r=>r[2]==='U').length,
+                     obecnosci.filter(r=>r[2]==='W').length]];
+  let kilometry=[["Stan początek","Stan koniec","Przebyty dystans"],
+                 [state.kmStart,state.kmEnd,state.kmEnd-state.kmStart>=0?state.kmEnd-state.kmStart:""]];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(obecnosci),"Obecność");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(podsumowanie),"Podsumowanie");
@@ -167,8 +159,7 @@ document.getElementById('btnExcel').addEventListener('click',()=>{
 elYear.addEventListener('input',()=>{state.year=parseInt(elYear.value,10)||new Date().getFullYear(); buildTable();});
 elMonth.addEventListener('input',()=>{state.month=parseInt(elMonth.value,10); buildTable();});
 elDriver.addEventListener('input',()=>{state.driver=elDriver.value; updateHeader();});
-kmStart.addEventListener('input',updateKmSummary);
-kmEnd.addEventListener('input',updateKmSummary);
+elAuto.addEventListener('input',()=>{state.auto=elAuto.value; updateHeader();});
 
 (function start(){elYear.value=state.year;elMonth.value=state.month;buildTable();})();
 </script>
