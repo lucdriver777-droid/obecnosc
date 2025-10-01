@@ -17,9 +17,9 @@
   <style>
     body { margin:0; font-family:"Times New Roman", Times, serif; background:#f7f7fb; color:#111; }
     .wrap { max-width:900px; margin:24px auto; padding:0 16px; }
-    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap: wrap; }
     .toolbar .spacer { flex:1; }
-    .btn { padding:6px 10px; border:1px solid #ccc; border-radius:6px; cursor:pointer; font-size:13px; }
+    .btn { padding:6px 10px; border:1px solid #ccc; border-radius:6px; cursor:pointer; font-size:13px; margin:2px; }
     .btn.primary { background:#0ea5e9; border-color:#0ea5e9; color:#fff; }
     .btn.ok { background:#16a34a; border-color:#16a34a; color:#fff; }
     table { width:100%; border-collapse:collapse; margin-bottom:12px; }
@@ -46,6 +46,7 @@
     <div class="spacer"></div>
     <button class="btn primary" id="btnPdf">Eksportuj do PDF</button>
     <button class="btn ok" id="btnExcel">Eksportuj do Excela</button>
+    <button class="btn" id="btnClear">Wyczyść dane</button>
   </div>
 
   <div class="controls no-print" style="margin-bottom:10px;">
@@ -72,7 +73,22 @@
 const PL_DAYS=['Nd','Pn','Wt','Śr','Cz','Pt','So'];
 const PL_MONTHS=['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
 
-const state={year:new Date().getFullYear(),month:new Date().getMonth(),driver:'',auto:'',attendance:{},hours:{},kmStart:0,kmEnd:0};
+let state={year:new Date().getFullYear(),month:new Date().getMonth(),driver:'',auto:'',attendance:{},hours:{},kmStart:0,kmEnd:0};
+
+// localStorage obsługa
+function saveState() {
+  localStorage.setItem("obecnoscState", JSON.stringify(state));
+}
+function loadState() {
+  const data = localStorage.getItem("obecnoscState");
+  if (data) {
+    try {
+      state = JSON.parse(data);
+    } catch(e) {
+      console.error("Błąd przy wczytywaniu localStorage", e);
+    }
+  }
+}
 
 const elYear=document.getElementById('year');
 const elMonth=document.getElementById('month');
@@ -123,23 +139,22 @@ function buildTable(){
   html+='</tbody></table>';
   wrapper.innerHTML=html;
 
+  // obsługa zdarzeń
   wrapper.querySelectorAll('.statusSel').forEach(sel=>sel.addEventListener('change',e=>{
-    const d=e.target.dataset.d; state.attendance[d]=e.target.value; buildTable();
+    const d=e.target.dataset.d; state.attendance[d]=e.target.value; saveState(); buildTable();
   }));
   wrapper.querySelectorAll('input[type="time"]').forEach(inp=>inp.addEventListener('change',e=>{
     const d=e.target.dataset.d; const type=e.target.dataset.type;
     if(!state.hours[d]) state.hours[d]={start:'',end:''};
-    state.hours[d][type]=e.target.value;
+    state.hours[d][type]=e.target.value; saveState();
   }));
   const kmStart=document.getElementById('kmStart');
   const kmEnd=document.getElementById('kmEnd');
   if(kmStart) kmStart.addEventListener('input',e=>{
-    state.kmStart=parseInt(e.target.value)||0;
-    buildTable();
+    state.kmStart=parseInt(e.target.value)||0; saveState(); buildTable();
   });
   if(kmEnd) kmEnd.addEventListener('input',e=>{
-    state.kmEnd=parseInt(e.target.value)||0;
-    buildTable();
+    state.kmEnd=parseInt(e.target.value)||0; saveState(); buildTable();
   });
   updateHeader();
 }
@@ -178,14 +193,25 @@ document.getElementById('btnExcel').addEventListener('click',()=>{
   XLSX.writeFile(wb,`Lista_obecnosci_${state.year}_${state.month+1}.xlsx`);
 });
 
-elYear.addEventListener('input',()=>{state.year=parseInt(elYear.value,10)||new Date().getFullYear(); buildTable();});
-elMonth.addEventListener('input',()=>{state.month=parseInt(elMonth.value,10); buildTable();});
-elDriver.addEventListener('input',()=>{state.driver=elDriver.value; updateHeader();});
-elAuto.addEventListener('input',()=>{state.auto=elAuto.value; updateHeader();});
+// Czyszczenie danych
+document.getElementById('btnClear').addEventListener('click',()=>{
+  if (confirm("Czy na pewno chcesz usunąć wszystkie zapisane dane?")) {
+    localStorage.removeItem("obecnoscState");
+    location.reload();
+  }
+});
+
+elYear.addEventListener('input',()=>{state.year=parseInt(elYear.value,10)||new Date().getFullYear(); saveState(); buildTable();});
+elMonth.addEventListener('input',()=>{state.month=parseInt(elMonth.value,10); saveState(); buildTable();});
+elDriver.addEventListener('input',()=>{state.driver=elDriver.value; saveState(); updateHeader();});
+elAuto.addEventListener('input',()=>{state.auto=elAuto.value; saveState(); updateHeader();});
 
 (function start(){
+  loadState();
   elYear.value=state.year;
   elMonth.value=state.month;
+  elDriver.value=state.driver;
+  elAuto.value=state.auto;
   buildTable();
   const d=new Date();
   document.getElementById("genDate").textContent="Wygenerowano: "+
