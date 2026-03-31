@@ -5,19 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Generator listy obecności</title>
 
-  <!-- Ikony -->
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
-
-  <!-- Manifest -->
   <link rel="manifest" href="manifest.json">
 
   <style>
     body { margin:0; font-family:"Times New Roman", Times, serif; background:#f7f7fb; color:#111; }
     .wrap { max-width:900px; margin:24px auto; padding:0 16px; }
-    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap: wrap; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
     .toolbar .spacer { flex:1; }
     .btn { padding:6px 10px; border:1px solid #ccc; border-radius:6px; cursor:pointer; font-size:13px; margin:2px; }
     .btn.primary { background:#0ea5e9; border-color:#0ea5e9; color:#fff; }
@@ -37,6 +34,7 @@
       @page { size:A4 portrait; margin:8mm }
     }
   </style>
+
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -56,175 +54,322 @@
     <label>Rok: <input type="number" id="year"></label>
     <label>Miesiąc:
       <select id="month">
-        <option value="0">Styczeń</option><option value="1">Luty</option><option value="2">Marzec</option>
-        <option value="3">Kwiecień</option><option value="4">Maj</option><option value="5">Czerwiec</option>
-        <option value="6">Lipiec</option><option value="7">Sierpień</option><option value="8">Wrzesień</option>
-        <option value="9">Październik</option><option value="10">Listopad</option><option value="11">Grudzień</option>
+        <option value="0">Styczeń</option>
+        <option value="1">Luty</option>
+        <option value="2">Marzec</option>
+        <option value="3">Kwiecień</option>
+        <option value="4">Maj</option>
+        <option value="5">Czerwiec</option>
+        <option value="6">Lipiec</option>
+        <option value="7">Sierpień</option>
+        <option value="8">Wrzesień</option>
+        <option value="9">Październik</option>
+        <option value="10">Listopad</option>
+        <option value="11">Grudzień</option>
       </select>
     </label>
   </div>
 
   <div id="reportHeader"></div>
   <div id="tableWrapper"></div>
-  <div id="footer">Twórcy: Łukasz Stasinski &amp; ChatGPT<br><span id="genDate"></span></div>
+  <div id="footer">Twórcy: Łukasz Stasiński &amp; ChatGPT<br><span id="genDate"></span></div>
 </div>
 
 <script>
-const PL_DAYS=['Nd','Pn','Wt','Śr','Cz','Pt','So'];
-const PL_MONTHS=['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
+const PL_DAYS = ['Nd','Pn','Wt','Śr','Cz','Pt','So'];
+const PL_MONTHS = ['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
 
-let state={year:new Date().getFullYear(),month:new Date().getMonth(),driver:'',auto:'',attendance:{},hours:{},kmStart:0,kmEnd:0};
+const STORAGE_KEY = "obecnoscState_v2";
 
-// localStorage obsługa
+let state = {
+  year: new Date().getFullYear(),
+  month: new Date().getMonth(),
+  company: '',
+  driver: '',
+  auto: '',
+  attendance: {},
+  hours: {},
+  kmStart: 0,
+  kmEnd: 0
+};
+
 function saveState() {
-  localStorage.setItem("obecnoscState", JSON.stringify(state));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
+
 function loadState() {
-  const data = localStorage.getItem("obecnoscState");
-  if (data) {
-    try {
-      state = JSON.parse(data);
-    } catch(e) {
-      console.error("Błąd przy wczytywaniu localStorage", e);
-    }
+  const data = localStorage.getItem(STORAGE_KEY);
+  if (!data) return;
+
+  try {
+    const parsed = JSON.parse(data);
+    state = {
+      year: parsed.year ?? new Date().getFullYear(),
+      month: parsed.month ?? new Date().getMonth(),
+      company: parsed.company || '',
+      driver: parsed.driver || '',
+      auto: parsed.auto || '',
+      attendance: parsed.attendance || {},
+      hours: parsed.hours || {},
+      kmStart: Number(parsed.kmStart) || 0,
+      kmEnd: Number(parsed.kmEnd) || 0
+    };
+  } catch (e) {
+    console.error("Błąd przy wczytywaniu localStorage", e);
   }
 }
 
-const elYear=document.getElementById('year');
-const elMonth=document.getElementById('month');
-const elDriver=document.getElementById('driver');
-const elAuto=document.getElementById('auto');
-const wrapper=document.getElementById('tableWrapper');
-const reportHeader=document.getElementById('reportHeader');
+const elCompany = document.getElementById('company');
+const elYear = document.getElementById('year');
+const elMonth = document.getElementById('month');
+const elDriver = document.getElementById('driver');
+const elAuto = document.getElementById('auto');
+const wrapper = document.getElementById('tableWrapper');
+const reportHeader = document.getElementById('reportHeader');
 
-function daysInMonth(m,y){return new Date(y,m+1,0).getDate();}
-function isWeekend(y,m,d){let wd=new Date(y,m,d).getDay();return wd===0||wd===6;}
+function daysInMonth(m, y) {
+  return new Date(y, m + 1, 0).getDate();
+}
 
-function buildTable(){
-  const dim=daysInMonth(state.month,state.year);
-  let html='<table><thead><tr><th>Dzień</th><th>Status</th><th>Start</th><th>Koniec</th></tr></thead><tbody>';
-  let totalOk=0,totalX=0,totalU=0,totalW=0,totalSob=0,totalNd=0;
-  for(let d=1;d<=dim;d++){
-    let wd=new Date(state.year,state.month,d).getDay();
-    let val=state.attendance[d]|| (isWeekend(state.year,state.month,d)?'W':'');
-    if(val==='✔') totalOk++;
-    if(val==='x') totalX++;
-    if(val==='U') totalU++;
-    if(val==='W'){ totalW++; if(wd===6) totalSob++; if(wd===0) totalNd++; }
-    let h=state.hours[d]||{start:'',end:''};
+function isWeekend(y, m, d) {
+  const wd = new Date(y, m, d).getDay();
+  return wd === 0 || wd === 6;
+}
 
-    html+=`<tr class="${val==='W'?'mark-weekend':''}">
-      <td>${d} ${PL_DAYS[wd]}</td>
-      <td>
-        <select data-d="${d}" class="statusSel">
-          <option value="" ${val===''?'selected':''}></option>
-          <option value="✔" ${val==='✔'?'selected':''}>✔</option>
-          <option value="x" ${val==='x'?'selected':''}>x</option>
-          <option value="U" ${val==='U'?'selected':''}>U</option>
-          <option value="W" ${val==='W'?'selected':''}>W</option>
-        </select>
-      </td>
-      <td><input type="time" value="${h.start}" data-d="${d}" data-type="start"></td>
-      <td><input type="time" value="${h.end}" data-d="${d}" data-type="end"></td>
-    </tr>`;
+function getDefaultStatus(y, m, d) {
+  return isWeekend(y, m, d) ? 'W' : '';
+}
+
+function buildTable() {
+  const dim = daysInMonth(state.month, state.year);
+  let html = '<table><thead><tr><th>Dzień</th><th>Status</th><th>Start</th><th>Koniec</th></tr></thead><tbody>';
+
+  let totalPresent = 0;
+  let totalFree = 0;
+  let totalVacation = 0;
+  let totalWeekend = 0;
+  let totalL4 = 0;
+  let totalSob = 0;
+  let totalNd = 0;
+
+  for (let d = 1; d <= dim; d++) {
+    const wd = new Date(state.year, state.month, d).getDay();
+    const val = state.attendance[d] || getDefaultStatus(state.year, state.month, d);
+    const h = state.hours[d] || { start: '', end: '' };
+
+    if (val === '✓') totalPresent++;
+    if (val === 'x') totalFree++;
+    if (val === 'U') totalVacation++;
+    if (val === 'L4') totalL4++;
+    if (val === 'W') {
+      totalWeekend++;
+      if (wd === 6) totalSob++;
+      if (wd === 0) totalNd++;
+    }
+
+    html += `
+      <tr class="${val === 'W' ? 'mark-weekend' : ''}">
+        <td>${d} ${PL_DAYS[wd]}</td>
+        <td>
+          <select data-d="${d}" class="statusSel">
+            <option value="" ${val === '' ? 'selected' : ''}></option>
+            <option value="✓" ${val === '✓' ? 'selected' : ''}>✓</option>
+            <option value="L4" ${val === 'L4' ? 'selected' : ''}>L4</option>
+            <option value="U" ${val === 'U' ? 'selected' : ''}>U</option>
+            <option value="x" ${val === 'x' ? 'selected' : ''}>x</option>
+            <option value="W" ${val === 'W' ? 'selected' : ''}>W</option>
+          </select>
+        </td>
+        <td><input type="time" value="${h.start || ''}" data-d="${d}" data-type="start"></td>
+        <td><input type="time" value="${h.end || ''}" data-d="${d}" data-type="end"></td>
+      </tr>
+    `;
   }
 
-  // podsumowanie
-  html+=`<tr><td colspan="4">✔ Obecności: ${totalOk} | x Wolne: ${totalX} | U Urlopy: ${totalU} | W Weekendy: ${totalW} (S:${totalSob}, N:${totalNd})</td></tr>`;
-  const traveled=state.kmEnd-state.kmStart;
-  html+=`<tr><td>Stan początek: <input type="number" id="kmStart" value="${state.kmStart}" style="width:80px"></td>
-             <td>Stan koniec: <input type="number" id="kmEnd" value="${state.kmEnd}" style="width:80px"></td>
-             <td colspan="2">Przebyty dystans: ${traveled>=0?traveled:''} km</td></tr>`;
+  html += `
+    <tr>
+      <td colspan="4">
+        ✓ Obecność: ${totalPresent} |
+        L4: ${totalL4} |
+        U Urlop: ${totalVacation} |
+        x Wolne: ${totalFree} |
+        W Weekendy: ${totalWeekend} (S:${totalSob}, N:${totalNd})
+      </td>
+    </tr>
+  `;
 
-  html+='</tbody></table>';
-  wrapper.innerHTML=html;
+  const traveled = state.kmEnd - state.kmStart;
 
-  // obsługa zdarzeń
-  wrapper.querySelectorAll('.statusSel').forEach(sel=>sel.addEventListener('change',e=>{
-    const d=e.target.dataset.d; state.attendance[d]=e.target.value; saveState(); buildTable();
-  }));
-  wrapper.querySelectorAll('input[type="time"]').forEach(inp=>inp.addEventListener('change',e=>{
-    const d=e.target.dataset.d; const type=e.target.dataset.type;
-    if(!state.hours[d]) state.hours[d]={start:'',end:''};
-    state.hours[d][type]=e.target.value; saveState();
-  }));
-  const kmStart=document.getElementById('kmStart');
-  const kmEnd=document.getElementById('kmEnd');
-  if(kmStart) kmStart.addEventListener('input',e=>{
-    state.kmStart=parseInt(e.target.value)||0; saveState(); buildTable();
+  html += `
+    <tr>
+      <td>Stan początek: <input type="number" id="kmStart" value="${state.kmStart}" style="width:80px"></td>
+      <td>Stan koniec: <input type="number" id="kmEnd" value="${state.kmEnd}" style="width:80px"></td>
+      <td colspan="2">Przebyty dystans: ${traveled >= 0 ? traveled : ''} km</td>
+    </tr>
+  `;
+
+  html += '</tbody></table>';
+  wrapper.innerHTML = html;
+
+  wrapper.querySelectorAll('.statusSel').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const d = e.target.dataset.d;
+      state.attendance[d] = e.target.value;
+      saveState();
+      buildTable();
+    });
   });
-  if(kmEnd) kmEnd.addEventListener('input',e=>{
-    state.kmEnd=parseInt(e.target.value)||0; saveState(); buildTable();
+
+  wrapper.querySelectorAll('input[type="time"]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const d = e.target.dataset.d;
+      const type = e.target.dataset.type;
+      if (!state.hours[d]) state.hours[d] = { start: '', end: '' };
+      state.hours[d][type] = e.target.value;
+      saveState();
+    });
   });
+
+  const kmStart = document.getElementById('kmStart');
+  const kmEnd = document.getElementById('kmEnd');
+
+  if (kmStart) {
+    kmStart.addEventListener('input', e => {
+      state.kmStart = parseInt(e.target.value, 10) || 0;
+      saveState();
+      buildTable();
+    });
+  }
+
+  if (kmEnd) {
+    kmEnd.addEventListener('input', e => {
+      state.kmEnd = parseInt(e.target.value, 10) || 0;
+      saveState();
+      buildTable();
+    });
+  }
+
   updateHeader();
 }
 
-function updateHeader(){
+function updateHeader() {
   reportHeader.innerHTML =
-    `Firma: ${document.getElementById('company').value || ''}<br>` +
-    `Kierowca: ${state.driver} | Auto: ${state.auto}<br>` +
+    `Firma: ${state.company || ''}<br>` +
+    `Kierowca: ${state.driver || ''} | Auto: ${state.auto || ''}<br>` +
     `Lista obecności – ${PL_MONTHS[state.month]} ${state.year}`;
 }
 
-// PDF
-document.getElementById('btnPdf').addEventListener('click',()=>window.print());
+document.getElementById('btnPdf').addEventListener('click', () => window.print());
 
-// Excel
-document.getElementById('btnExcel').addEventListener('click',()=>{
-  const days=daysInMonth(state.month,state.year);
-  let obecnosci=[["Dzień","Nazwa dnia","Status","Start","Koniec"]];
-  for(let d=1;d<=days;d++){
-    const wd=new Date(state.year,state.month,d).getDay();
-    const nazwaDnia=PL_DAYS[wd];
-    const val=state.attendance[d]||''; const h=state.hours[d]||{start:'',end:''};
-    obecnosci.push([d,nazwaDnia,val,h.start,h.end]);
+document.getElementById('btnExcel').addEventListener('click', () => {
+  const days = daysInMonth(state.month, state.year);
+
+  const obecnosci = [["Dzień","Nazwa dnia","Status","Start","Koniec"]];
+
+  for (let d = 1; d <= days; d++) {
+    const wd = new Date(state.year, state.month, d).getDay();
+    const nazwaDnia = PL_DAYS[wd];
+    const val = state.attendance[d] || getDefaultStatus(state.year, state.month, d);
+    const h = state.hours[d] || { start: '', end: '' };
+
+    obecnosci.push([d, nazwaDnia, val, h.start, h.end]);
   }
-  let podsumowanie=[["✔ Obecności","x Wolne","U Urlopy","W Weekendy (Sob/Nd)"],
-                    [obecnosci.filter(r=>r[2]==='✔').length,
-                     obecnosci.filter(r=>r[2]==='x').length,
-                     obecnosci.filter(r=>r[2]==='U').length,
-                     obecnosci.filter(r=>r[2]==='W').length]];
-  let kilometry=[["Stan początek","Stan koniec","Przebyty dystans"],
-                 [state.kmStart,state.kmEnd,state.kmEnd-state.kmStart>=0?state.kmEnd-state.kmStart:""]];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(obecnosci),"Obecność");
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(podsumowanie),"Podsumowanie");
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(kilometry),"Kilometry");
-  XLSX.writeFile(wb,`Lista_obecnosci_${state.year}_${state.month+1}.xlsx`);
+
+  const summaryPresent = obecnosci.filter(r => r[2] === '✓').length;
+  const summaryL4 = obecnosci.filter(r => r[2] === 'L4').length;
+  const summaryVacation = obecnosci.filter(r => r[2] === 'U').length;
+  const summaryFree = obecnosci.filter(r => r[2] === 'x').length;
+  const summaryWeekend = obecnosci.filter(r => r[2] === 'W').length;
+
+  const podsumowanie = [
+    ["✓ Obecność", "L4", "U Urlop", "x Wolne", "W Weekendy"],
+    [summaryPresent, summaryL4, summaryVacation, summaryFree, summaryWeekend]
+  ];
+
+  const kilometry = [
+    ["Stan początek", "Stan koniec", "Przebyty dystans"],
+    [state.kmStart, state.kmEnd, state.kmEnd - state.kmStart >= 0 ? state.kmEnd - state.kmStart : ""]
+  ];
+
+  const info = [
+    ["Firma", state.company],
+    ["Kierowca", state.driver],
+    ["Auto", state.auto],
+    ["Rok", state.year],
+    ["Miesiąc", PL_MONTHS[state.month]]
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(info), "Informacje");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(obecnosci), "Obecność");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(podsumowanie), "Podsumowanie");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kilometry), "Kilometry");
+
+  XLSX.writeFile(wb, `Lista_obecnosci_${state.year}_${state.month + 1}.xlsx`);
 });
 
-// Czyszczenie danych
-document.getElementById('btnClear').addEventListener('click',()=>{
+document.getElementById('btnClear').addEventListener('click', () => {
   if (confirm("Czy na pewno chcesz usunąć wszystkie zapisane dane?")) {
-    localStorage.removeItem("obecnoscState");
+    localStorage.removeItem(STORAGE_KEY);
     location.reload();
   }
 });
 
-elYear.addEventListener('input',()=>{state.year=parseInt(elYear.value,10)||new Date().getFullYear(); saveState(); buildTable();});
-elMonth.addEventListener('input',()=>{state.month=parseInt(elMonth.value,10); saveState(); buildTable();});
-elDriver.addEventListener('input',()=>{state.driver=elDriver.value; saveState(); updateHeader();});
-elAuto.addEventListener('input',()=>{state.auto=elAuto.value; saveState(); updateHeader();});
+elCompany.addEventListener('input', () => {
+  state.company = elCompany.value;
+  saveState();
+  updateHeader();
+});
 
-(function start(){
-  loadState();
-  elYear.value=state.year;
-  elMonth.value=state.month;
-  elDriver.value=state.driver;
-  elAuto.value=state.auto;
+elYear.addEventListener('input', () => {
+  state.year = parseInt(elYear.value, 10) || new Date().getFullYear();
+  saveState();
   buildTable();
-  const d=new Date();
-  document.getElementById("genDate").textContent="Wygenerowano: "+
-    d.toLocaleDateString("pl-PL",{year:"numeric",month:"2-digit",day:"2-digit"})+" "+
-    d.toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"});
+});
+
+elMonth.addEventListener('input', () => {
+  state.month = parseInt(elMonth.value, 10);
+  saveState();
+  buildTable();
+});
+
+elDriver.addEventListener('input', () => {
+  state.driver = elDriver.value;
+  saveState();
+  updateHeader();
+});
+
+elAuto.addEventListener('input', () => {
+  state.auto = elAuto.value;
+  saveState();
+  updateHeader();
+});
+
+(function start() {
+  loadState();
+
+  elCompany.value = state.company;
+  elYear.value = state.year;
+  elMonth.value = state.month;
+  elDriver.value = state.driver;
+  elAuto.value = state.auto;
+
+  buildTable();
+
+  const d = new Date();
+  document.getElementById("genDate").textContent =
+    "Wygenerowano: " +
+    d.toLocaleDateString("pl-PL", { year:"numeric", month:"2-digit", day:"2-digit" }) +
+    " " +
+    d.toLocaleTimeString("pl-PL", { hour:"2-digit", minute:"2-digit" });
 })();
 </script>
 
-<!-- Rejestracja service workera -->
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js')
-    .then(() => console.log("Service Worker zarejestrowany"));
+    .then(() => console.log("Service Worker zarejestrowany"))
+    .catch(err => console.error("Błąd rejestracji SW:", err));
 }
 </script>
 </body>
